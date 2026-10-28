@@ -21,7 +21,8 @@ env:
 
 jobs:
   build-desktop-app:
-    runs-on: macos-14
+    # macos-14 arm64 runner 经常容量不足排队被取消；macos-15 同为 arm64，拥堵较少
+    runs-on: macos-15
     env:
       CGO_ENABLED: 1
     steps:
