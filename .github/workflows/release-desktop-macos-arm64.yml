@@ -52,49 +52,20 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build desktop app
+      # 复用项目自带打包脚本：构建前端 → 同步 web/ → wails build → 组装 .app（含 Resources/config/migrations/web）
+      - name: Build & package .app (project script)
         shell: bash
         run: |
-          export EDITION=lite
-          export GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn
-          eval "$(./scripts/get_version.sh env)"
-          LDFLAGS="$(./scripts/get_version.sh ldflags) -X 'google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn'"
-          export CGO_CFLAGS="-Wno-deprecated-declarations"
-          export CGO_LDFLAGS="-Wl,-no_warn_duplicate_libraries"
+          export GONOSUMDB="git.sr.ht/*"
+          export GOPROXY="https://proxy.golang.org,direct"
+          bash ./scripts/package-mac-app.sh
 
-          bash ./scripts/check-license-bundle.sh
-          cd cmd/desktop
-          wails build -clean \
-            -tags "sqlite_fts5" \
-            -platform "darwin/arm64" \
-            -ldflags="${LDFLAGS}" \
-            -o "WeKnora Lite"
-
-      - name: Package macOS app
+      - name: Create DMG
         run: |
-          APP_BUNDLE="WeKnora Lite.app"
-          SRC="cmd/desktop/build/bin/${APP_BUNDLE}"
-          RESOURCES="${SRC}/Contents/Resources"
-
-          mkdir -p "${RESOURCES}/config"
-          mkdir -p "${RESOURCES}/migrations/sqlite"
-          bash ./scripts/copy-licenses.sh "${RESOURCES}"
-
-          if [ -f .env.lite.example ]; then
-            cp .env.lite.example "${RESOURCES}/.env"
-          fi
-          if [ -d migrations/sqlite ]; then
-            cp -r migrations/sqlite/* "${RESOURCES}/migrations/sqlite/"
-          fi
-          if [ -d config ]; then
-            cp -r config/* "${RESOURCES}/config/"
-          fi
-
           DMG_NAME="WeKnora-Lite-App_${{ steps.ver.outputs.version }}_macOS_arm64"
-
           DMG_SRC="dmg_staging"
           mkdir -p "${DMG_SRC}"
-          cp -R "cmd/desktop/build/bin/${APP_BUNDLE}" "${DMG_SRC}/"
+          cp -R "dist/WeKnora Lite.app" "${DMG_SRC}/"
           ln -s /Applications "${DMG_SRC}/Applications"
 
           hdiutil create -volname "WeKnora Lite" \
@@ -137,5 +108,5 @@ jobs:
         run: |
           gh release create "${{ steps.ver.outputs.version }}-macos-arm64" \
             --title "WeKnora Lite ${{ steps.ver.outputs.version }} (macOS arm64)" \
-            --notes "WeKnora Lite 桌面应用 macOS arm64 (Apple Silicon) 构建产物，由 fork 流水线手动触发构建。双击 dmg 拖入 Applications 即可运行。" \
+            --notes "WeKnora Lite 桌面应用 macOS arm64 (Apple Silicon) 构建产物。双击 dmg 拖入 Applications 即可运行。" \
             WeKnora-Lite-App_* || true
