@@ -76,10 +76,10 @@ jobs:
              "${DICT_SRC}/user.dict.utf8" "${DICT_SRC}/idf.utf8" \
              "${DICT_SRC}/stop_words.utf8" "${APP}/Contents/Resources/jieba/"
 
-          PLIST="${APP}/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :LSEnvironment:JIEBA_DICT_DIR string ${APP}/Contents/Resources/jieba" "$PLIST"
-          plutil -lint "$PLIST"
+          # LSEnvironment 无法表达"app 自身路径"，词典定位已改由 Go 代码
+          # （internal/types/evaluation.go newJieba）按可执行文件相对路径解析。
+          # 这里重新签名使词典资源进入 adhoc 签名。
+          plutil -lint "${APP}/Contents/Info.plist"
 
           # 重新签名使修改后的 Info.plist 生效（原 adhoc 签名会因资源变动失效）
           codesign --force --deep --sign - "${APP}"
