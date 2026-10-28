@@ -58,6 +58,8 @@ jobs:
         run: |
           export GONOSUMDB="git.sr.ht/*"
           export GOPROXY="https://proxy.golang.org,direct"
+          # 前端 vite 构建内存占用超过 Node 默认堆上限（4G），在 CI 上会 OOM Abort 6
+          export NODE_OPTIONS="--max-old-space-size=8192"
           bash ./scripts/package-mac-app.sh
 
       - name: Create DMG
