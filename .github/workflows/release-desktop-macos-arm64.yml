@@ -63,6 +63,27 @@ jobs:
           export NODE_OPTIONS="--max-old-space-size=8192"
           bash ./scripts/package-mac-app.sh
 
+      # gojieba 在包级 init()（先于 main 的 godotenv.Load）从编译机绝对路径加载词典，
+      # 产物拷到别的机器必 panic 闪退。把词典打进 Resources，并用 Info.plist
+      # LSEnvironment 让 LaunchServices 双击启动时注入 JIEBA_DICT_DIR。
+      - name: Bundle jieba dictionaries
+        run: |
+          APP="dist/WeKnora Lite.app"
+          DICT_SRC="$(go env GOMODCACHE)/github.com/yanyiwu/gojieba@v1.4.7/deps/cppjieba/dict"
+          ls "${DICT_SRC}"
+          mkdir -p "${APP}/Contents/Resources/jieba"
+          cp "${DICT_SRC}/jieba.dict.utf8" "${DICT_SRC}/hmm_model.utf8" \
+             "${DICT_SRC}/user.dict.utf8" "${DICT_SRC}/idf.utf8" \
+             "${DICT_SRC}/stop_words.utf8" "${APP}/Contents/Resources/jieba/"
+
+          PLIST="${APP}/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :LSEnvironment:JIEBA_DICT_DIR string ${APP}/Contents/Resources/jieba" "$PLIST"
+          plutil -lint "$PLIST"
+
+          # 重新签名使修改后的 Info.plist 生效（原 adhoc 签名会因资源变动失效）
+          codesign --force --deep --sign - "${APP}"
+
       - name: Create DMG
         run: |
           DMG_NAME="WeKnora-Lite-App_${{ steps.ver.outputs.version }}_macOS_arm64"
