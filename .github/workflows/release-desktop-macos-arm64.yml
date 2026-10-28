@@ -53,6 +53,19 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
+      # docx/doc/pptx 等办公格式默认走 DocReader gRPC 服务，桌面版没有该服务会解析失败；
+      # 链接 anydoc 进程内引擎（-tags anydoc）后自动接管这些格式，无需外部服务。
+      - name: Install Rust toolchain
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          rustc --version
+
+      - name: Build anydoc static library
+        run: ./scripts/build-anydoc-lib.sh
+
       # 复用项目自带打包脚本：构建前端 → 同步 web/ → wails build → 组装 .app（含 Resources/config/migrations/web）
       - name: Build & package .app (project script)
         shell: bash
@@ -61,6 +74,7 @@ jobs:
           export GOPROXY="https://proxy.golang.org,direct"
           # 前端 vite 构建内存占用超过 Node 默认堆上限（4G），在 CI 上会 OOM Abort 6
           export NODE_OPTIONS="--max-old-space-size=8192"
+          export WAILS_TAGS="sqlite_fts5,anydoc"
           bash ./scripts/package-mac-app.sh
 
       # gojieba 在包级 init()（先于 main 的 godotenv.Load）从编译机绝对路径加载词典，
