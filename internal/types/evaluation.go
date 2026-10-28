@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/yanyiwu/gojieba"
@@ -14,6 +15,21 @@ var Jieba *gojieba.Jieba = newJieba()
 
 func newJieba() *gojieba.Jieba {
 	dictDir := os.Getenv("JIEBA_DICT_DIR")
+	if dictDir == "" {
+		// Packaged desktop builds carry the dictionaries in the app bundle
+		// (Contents/Resources/jieba); resolve relative to the executable so
+		// the app starts on machines without the CI build paths. Bare
+		// gojieba.NewJieba() reads dictionaries from the compile-time module
+		// cache path and panics there.
+		if execPath, err := os.Executable(); err == nil &&
+			strings.Contains(execPath, ".app/Contents/MacOS") {
+			resPath := filepath.Join(filepath.Dir(filepath.Dir(execPath)),
+				"Resources", "jieba")
+			if _, err := os.Stat(filepath.Join(resPath, "jieba.dict.utf8")); err == nil {
+				dictDir = resPath
+			}
+		}
+	}
 	if dictDir == "" {
 		return gojieba.NewJieba()
 	}
